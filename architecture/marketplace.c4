@@ -1,0 +1,131 @@
+specification {
+  element person {
+    style {
+      shape person
+    }
+  }
+  element system
+  element container
+  element database {
+    style {
+      shape storage
+    }
+  }
+  relationship sync {
+    line solid
+  }
+  relationship async {
+    line dashed
+    color amber
+  }
+  relationship data {
+    line solid
+  }
+}
+
+model {
+  buyer = person 'Buyer' {
+    description 'Browses a personalized product feed and places orders.'
+  }
+  seller = person 'Seller' {
+    description 'Manages product listings and follows order statuses.'
+  }
+
+  marketplace = system 'Marketplace' {
+    description 'Sellers publish products; buyers discover products and place orders.'
+
+    web = container 'Web Client' {
+      technology 'Browser application (conceptual)'
+      description 'Buyer and seller interface; calls service APIs.'
+    }
+    users = container 'User Service' {
+      technology 'Python / FastAPI / Uvicorn'
+      description 'Owns buyers, sellers, profiles and roles. Only GET /health is implemented.'
+    }
+    catalog = container 'Catalog Service' {
+      technology 'HTTP/REST API (conceptual)'
+      description 'Owns products, descriptions, categories and seller product management.'
+    }
+    recommendations = container 'Recommendation Service' {
+      technology 'HTTP/REST API + event consumer (conceptual)'
+      description 'Provides the personalized feed; owns derived preferences and recommendation results/models.'
+    }
+    orders = container 'Order Service' {
+      technology 'HTTP/REST API + event consumer (conceptual)'
+      description 'Creates orders; owns order items and order status.'
+    }
+    payments = container 'Payment Service' {
+      technology 'HTTP/REST API + event producer (conceptual)'
+      description 'Calculates and accounts for payments; owns payment records and payment state.'
+    }
+    notifications = container 'Notification Service' {
+      technology 'Event consumer (conceptual)'
+      description 'Delivers order/payment notifications; owns notification records and delivery status.'
+    }
+    broker = container 'Event Broker' {
+      technology 'Message broker (conceptual; not deployed)'
+      description 'Routes payment, order and user/catalog activity events to subscribers.'
+    }
+
+    userDb = database 'User DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only User Service accesses users, profiles and roles.'
+    }
+    catalogDb = database 'Catalog DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only Catalog Service accesses products, categories and product metadata.'
+    }
+    recommendationDb = database 'Recommendation DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only Recommendation Service accesses models/results and derived preferences.'
+    }
+    orderDb = database 'Order DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only Order Service accesses orders, order items and order state.'
+    }
+    paymentDb = database 'Payment DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only Payment Service accesses payments, payment state and accounting records.'
+    }
+    notificationDb = database 'Notification DB' {
+      technology 'Logical data store; not deployed'
+      description 'Only Notification Service accesses notifications and delivery status.'
+    }
+  }
+
+  buyer -> marketplace.web 'Uses the buyer interface (HTTPS)'
+  seller -> marketplace.web 'Uses the seller interface (HTTPS)'
+
+  marketplace.web -[sync]-> marketplace.users 'Profiles and roles: synchronous HTTP/REST'
+  marketplace.web -[sync]-> marketplace.catalog 'Browse/manage products: synchronous HTTP/REST'
+  marketplace.web -[sync]-> marketplace.recommendations 'Personalized feed: synchronous HTTP/REST'
+  marketplace.web -[sync]-> marketplace.orders 'Create/read orders: synchronous HTTP/REST'
+  marketplace.orders -[sync]-> marketplace.catalog 'Validate products and request product details/prices: synchronous HTTP/REST'
+  marketplace.orders -[sync]-> marketplace.payments 'Initiate payment calculation/record: synchronous HTTP/REST'
+
+  marketplace.users -[data]-> marketplace.userDb 'Reads/writes owned data (data-store access)'
+  marketplace.catalog -[data]-> marketplace.catalogDb 'Reads/writes owned data (data-store access)'
+  marketplace.recommendations -[data]-> marketplace.recommendationDb 'Reads/writes owned data (data-store access)'
+  marketplace.orders -[data]-> marketplace.orderDb 'Reads/writes owned data (data-store access)'
+  marketplace.payments -[data]-> marketplace.paymentDb 'Reads/writes owned data (data-store access)'
+  marketplace.notifications -[data]-> marketplace.notificationDb 'Reads/writes owned data (data-store access)'
+
+  marketplace.users -[async]-> marketplace.broker 'User activity: asynchronous events'
+  marketplace.catalog -[async]-> marketplace.broker 'Catalog activity/product changes: asynchronous events'
+  marketplace.payments -[async]-> marketplace.broker 'Payment status changed: asynchronous events'
+  marketplace.orders -[async]-> marketplace.broker 'Order status changed: asynchronous events'
+  marketplace.broker -[async]-> marketplace.orders 'Payment status changed: asynchronous events'
+  marketplace.broker -[async]-> marketplace.notifications 'Order/payment status changed: asynchronous events'
+  marketplace.broker -[async]-> marketplace.recommendations 'User/catalog activity: asynchronous events'
+}
+
+views {
+  view containers {
+    title 'Marketplace — C4 Container Diagram'
+    description 'Target architecture. Only the User Service health endpoint is deployed; every other container is conceptual. API/event relationships are planned, not implemented.'
+    include buyer
+    include seller
+    include marketplace.*
+    autoLayout TopBottom
+  }
+}

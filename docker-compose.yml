@@ -1,0 +1,6 @@
+services:
+  user-service:
+    build:
+      context: ./services/user-service
+    ports:
+      - "8000:8000"
